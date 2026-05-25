@@ -1,90 +1,19 @@
 import os
 import time
-import asyncio
-import orjson
+import requests
 import streamlit as st
-from pydantic import BaseModel, Field, ValidationError
-from groq import AsyncGroq, RateLimitError
 
-# =====================================================================
-# 1. HARDWARE BOUNDARY ENFORCEMENT (The Physics Firewall)
-# =====================================================================
-class ActuationCommand(BaseModel):
-    target_node_id: str
-    action: str = Field(description="Must match exact hardware registry operation codes.")
-    intensity_percentage: int = Field(ge=0, le=100, description="Clamp bounds to prevent kinetic damage.")
-    risk_mitigation_reason: str
-
-ACTUATION_TOOL = [
-    {
-        "type": "function",
-        "function": {
-            "name": "actuate_cluster_state",
-            "description": "Executes immediate hardware actuation overrides based on cluster telemetry anomalies.",
-            "parameters": ActuationCommand.model_json_schema()
-        }
-    }
-]
-
-MODEL_FALLBACK_CASCADE = [
-    "deepseek-r1-distill-qwen-1.5b",
-    "llama3-70b-8192"
-]
-
-# =====================================================================
-# 2. DIRECT INFERENCE PIPELINE (Bypasses FastAPI Network Layer)
-# =====================================================================
-async def run_resilient_cascade(telemetry: dict, anomaly: str) -> dict:
-    """Runs high-speed inference directly inside the Streamlit container thread."""
-    api_key = st.secrets.get("GROQ_API_KEY") if "GROQ_API_KEY" in st.secrets else os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        raise RuntimeError("CRITICAL: GROQ_API_KEY is missing from Streamlit Secrets.")
-        
-    async with AsyncGroq(api_key=api_key) as client:
-        system_prompt = (
-            "SYSTEM CRITICAL: You are an autonomous industrial hardware controller. "
-            "Analyze the provided live telemetry state vectors and execute the required function tool. "
-            "Do not output conversational text or pleasantries. Output raw JSON function arguments only."
-        )
-        
-        serialized_vectors = orjson.dumps(telemetry).decode("utf-8")
-        user_content = f"TELEMETRY STATE VECTORS:\n{serialized_vectors}\n\nCRITICAL ANOMALY EVENT: {anomaly}"
-
-        for model in MODEL_FALLBACK_CASCADE:
-            try:
-                response = await client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    tools=ACTUATION_TOOL,
-                    tool_choice={"type": "function", "function": {"name": "actuate_cluster_state"}},
-                    temperature=0.0
-                )
-                
-                raw_args = response.choices[0].message.tool_calls[0].function.arguments
-                parsed_json = orjson.loads(raw_args)
-                
-                validated_command = ActuationCommand(**parsed_json)
-                return validated_command.model_dump()
-                
-            except (ValidationError, orjson.JSONDecodeError, RateLimitError, Exception) as err:
-                st.warning(f"[TRAFFIC SHIFT] Node fallback active. Failure on {model}: {err}")
-                continue
-
-        raise RuntimeError("CRITICAL SHUTDOWN: Entire multi-model fallback loop exhausted.")
-
-# =====================================================================
-# 3. HUD TERMINAL STYLING & INTERFACE
-# =====================================================================
+# Set page config once at the absolute top
 st.set_page_config(page_title="AETHER-FRACTAL // GOVERNOR CORE", page_icon="💠", layout="wide")
 
+# =====================================================================
+# 1. CYBERPUNK HUD TERMINAL STYLING
+# =====================================================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght=400;700&display=swap');
     * { font-family: 'JetBrains+Mono', monospace !important; }
-    .stApp { background-color: #0A0A0C; }
+    .stApp { background: #0A0A0C !important; }
     .stMetric { background: #111216; border: 1px solid #1E2028; padding: 15px; border-radius: 4px; }
     .stMetric label { color: #8F93A2 !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: 1px; }
     .stMetric div { color: #00FF66 !important; font-weight: 700 !important; }
@@ -93,12 +22,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# =====================================================================
+# 2. RUNTIME DASHBOARD HEADER
+# =====================================================================
 st.markdown("<h1 style='color: #FFFFFF; font-size: 26px; margin-bottom: 0px;'>💠 AETHER-FRACTAL // CORE HUD</h1>", unsafe_allow_html=True)
 st.markdown("<p style='color: #4E5266; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;'>Autonomous Edge Actuation & Sovereign Hardware Governance Subsystem</p>", unsafe_allow_html=True)
 st.markdown("<hr style='border-color: #1E2028; margin-top: 10px; margin-bottom: 20px;' />", unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1, 2])
 
+# =====================================================================
+# 3. LEFT PANEL: LIVE TELEMETRY SIMULATOR
+# =====================================================================
 with col_left:
     st.markdown("<p style='color: #FF3366; font-size: 12px; font-weight: bold;'>⚡ LIVE TELEMETRY SIMULATOR</p>", unsafe_allow_html=True)
     
@@ -114,39 +49,76 @@ with col_left:
     
     trigger_actuation = st.button("DISPATCH COMMAND")
 
+# =====================================================================
+# 4. RIGHT PANEL: DETERMINISTIC FRONTEND LOGIC
+# =====================================================================
 with col_right:
     if trigger_actuation:
         payload = {
-            "node_id": node_id,
-            "silicon_temperature_celsius": temp,
-            "power_draw_kw": power,
-            "coolant_flow_rate_lpm": flow
+            "telemetry_context": {
+                "node_id": node_id,
+                "silicon_temperature_celsius": temp,
+                "power_draw_kw": power,
+                "coolant_flow_rate_lpm": flow
+            },
+            "query_anomaly": anomaly_msg
         }
         
+        command = None
+        elapsed = 0.0
+        status_msg = "UNKNOWN"
+        
+        # --- DUAL EXECUTION ROUTER ---
         try:
-            with st.spinner("Executing direct low-latency inference loop via LPU cascade..."):
-                start_time = time.perf_counter()
+            # MODE A: Local API Connection Path
+            response = requests.post("http://127.0.0.1:8000/api/v1/actuate", json=payload, timeout=1.0)
+            if response.status_code == 200:
+                res_data = response.json()
+                command = res_data["command"]
+                elapsed = res_data["elapsed_ms"]
+                status_msg = res_data["status"]
+            else:
+                st.error(f"ENGINE CRITICAL ERROR: Gateway returned status code {response.status_code}")
                 
-                command = asyncio.run(run_resilient_cascade(payload, anomaly_msg))
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            # MODE B: Cloud Container Deployment Gateway Path
+            try:
+                import main  
+                from groq import AsyncGroq
+                import asyncio
                 
-                elapsed = round((time.perf_counter() - start_time) * 1000, 2)
+                api_key = st.secrets.get("GROQ_API_KEY") if "GROQ_API_KEY" in st.secrets else os.environ.get("GROQ_API_KEY")
                 
-                m1, m2, m3 = st.columns(3)
-                m1.metric(label="GATEWAY PIPELINE", value="SUCCESS (DIRECT)")
-                m2.metric(label="LOOP LATENCY", value=f"{elapsed} ms")
-                m3.metric(label="FIREWALL CLAMP", value="ACTIVE (100%)")
-                
-                st.markdown("<p style='color: #00FF66; font-size: 12px; font-weight: bold; margin-top: 20px;'>🛡️ VERIFIED HARDWARE COMMAND OUTBOUND PAYLOAD</p>", unsafe_allow_html=True)
-                st.json(command)
-                st.info(f"**GOVERNOR DECISION RATIONALE:** {command['risk_mitigation_reason']}")
-                
-        except Exception as ex:
-            st.error(f"AIR-GAP CRITICAL INTERVENTION ERROR: {str(ex)}")
+                if not api_key:
+                    st.error("AIR-GAP CRITICAL INTERVENTION: GROQ_API_KEY missing from Streamlit Secrets.")
+                else:
+                    client = AsyncGroq(api_key=api_key)
+                    start_time = time.perf_counter()
+                    
+                    command = asyncio.run(main.run_resilient_cascade(
+                        client=client, 
+                        telemetry=payload["telemetry_context"], 
+                        anomaly=payload["query_anomaly"]
+                    ))
+                    
+                    elapsed = round((time.perf_counter() - start_time) * 1000, 2)
+                    status_msg = "SUCCESS (CLOUD DIRECT VIA MAIN.PY)"
+            except Exception as cloud_err:
+                st.error(f"RUNTIME PANIC: Failed direct module execution. Details: {cloud_err}")
+
+        if command:
+            m1, m2, m3 = st.columns(3)
+            m1.metric(label="GATEWAY PIPELINE", value=status_msg)
+            m2.metric(label="LOOP LATENCY", value=f"{elapsed} ms")
+            m3.metric(label="FIREWALL CLAMP", value="ACTIVE (100%)")
+            
+            st.markdown("<p style='color: #00FF66; font-size: 12px; font-weight: bold; margin-top: 20px;'>🛡️ VERIFIED HARDWARE COMMAND OUTBOUND PAYLOAD</p>", unsafe_allow_html=True)
+            st.json(command)
+            st.info(f"**GOVERNOR DECISION RATIONALE:** {command['risk_mitigation_reason']}")
             
     else:
         m1, m2, m3 = st.columns(3)
         m1.metric(label="GATEWAY STATUS", value="ONLINE")
         m2.metric(label="LOOP LATENCY", value="0.00 ms")
         m3.metric(label="FIREWALL CLAMP", value="READY")
-        
         st.markdown("<div style='border: 1px dashed #1E2028; padding: 40px; text-align: center; color: #4E5266; margin-top: 20px; font-size: 12px;'>SYSTEM IDLE // AWAITING STREAM PAYLOAD TRANSMISSION</div>", unsafe_allow_html=True)
