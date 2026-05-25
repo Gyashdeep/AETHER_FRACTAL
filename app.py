@@ -3,35 +3,44 @@ import psutil
 import json
 import asyncio
 from groq import AsyncGroq
-import pandas as pd
 
 # --- SOVEREIGN CONFIGURATION ---
 st.set_page_config(page_title="AETHER-KINETIC // VANTAGE", layout="wide")
-st.markdown("<style>.stApp { background: #020202; color: #00FF66; font-family: monospace; }</style>", unsafe_allow_html=True)
+st.markdown("""<style>.stApp { background: #020202; color: #00FF66; font-family: monospace; }</style>""", unsafe_allow_html=True)
 
-# --- GOVERNANCE ENGINE (Consolidated for Path Stability) ---
+# --- GOVERNANCE MANIFOLD (HARDENED) ---
 async def execute_sovereign_edict():
     telemetry = {
         "cpu_load": psutil.cpu_percent(interval=0.1),
         "mem_load": psutil.virtual_memory().percent,
-        "status": "OPERATIONAL_NODE"
+        "ts": "ACTIVE"
     }
     
-    # Secure API Call
+    # Initialize API
     client = AsyncGroq(api_key=st.secrets["GROQ_API_KEY"])
-    prompt = f"""
-    SYSTEM: AETHER-KINETIC VANTAGE. 
-    CONTEXT: {telemetry}. 
-    TASK: Execute kinetic arbitrage for sovereign yield.
-    OUTPUT: JSON ONLY: {{ "decision": "...", "yield": "...", "rationale": "..." }}
+    
+    # Enhanced prompt for strict JSON compliance
+    prompt = """
+    ACT AS AETHER-KINETIC GOVERNANCE. 
+    Analyze telemetry and output ONLY raw, parseable JSON. 
+    Do not include markdown tags or extra text. 
+    Format: {"decision": "BOOST/THROTTLE", "yield": "0.00%", "rationale": "..."}
     """
     
     response = await client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[{"role": "system", "content": prompt}],
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": str(telemetry)}
+        ],
         temperature=0.0
     )
-    return json.loads(response.choices[0].message.content)
+    
+    # Hardened Parsing Logic
+    raw_content = response.choices[0].message.content.strip()
+    clean_content = raw_content.replace('```json', '').replace('```', '').strip()
+    
+    return json.loads(clean_content)
 
 # --- UI GATEWAY ---
 st.title("💠 AETHER-KINETIC // VANTAGE")
@@ -43,7 +52,8 @@ if st.button("INITIATE SOVEREIGN PULSE"):
             result = asyncio.run(execute_sovereign_edict())
             st.json(result)
         except Exception as e:
-            st.error(f"Governance Failure: {str(e)}")
+            st.error(f"GOVERNANCE DRIFT DETECTED: {str(e)}")
+            st.code(f"Raw Output received: {raw_content if 'raw_content' in locals() else 'None'}")
 
 st.subheader("SYSTEM AUDIT TRAIL")
-st.info("Awaiting live telemetry stream...")
+st.info("System operational. Awaiting kinetic state-space reconciliation.")
