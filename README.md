@@ -1,7 +1,7 @@
-# AETHER-KINETIC VANTAGE: Autonomous Silicon Governance
+# KINETIC VANTAGE: Autonomous Silicon Governance
 
 ## Executive Summary
-AETHER-KINETIC VANTAGE is a sovereign infrastructure layer designed for **Kinetic Arbitrage** within high-entropy silicon substrates. By utilizing real-time **Telemetry Entropy** analysis and **Recursive Stochastic Heuristics**, the engine maintains **Sovereign Equilibrium** across distributed compute nodes, neutralizing latency before it manifests as operational drift.
+KINETIC VANTAGE is a sovereign infrastructure layer designed for **Kinetic Arbitrage** within high-entropy silicon substrates. By utilizing real-time **Telemetry Entropy** analysis and **Recursive Stochastic Heuristics**, the engine maintains **Sovereign Equilibrium** across distributed compute nodes, neutralizing latency before it manifests as operational drift.
 
 ## System Architecture
 * **Sensory Manifold:** Captures raw silicon-level thermals and load velocity at 100ms intervals.
