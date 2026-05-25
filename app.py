@@ -3,7 +3,6 @@ import psutil
 import json
 import asyncio
 from groq import AsyncGroq
-import time
 
 # --- SOVEREIGN CONFIGURATION ---
 st.set_page_config(page_title="AETHER-KINETIC // VANTAGE", layout="wide")
@@ -42,24 +41,13 @@ async def execute_sovereign_edict():
 st.title("💠 AETHER-KINETIC // VANTAGE")
 st.markdown("### Autonomous Sovereign Governance | Kinetic Arbitrage Engine")
 
-# Auto-Governance Heartbeat Logic
-if "auto_governance" not in st.session_state:
-    st.session_state.auto_governance = False
-
-if st.sidebar.button("ACTIVATE AUTONOMOUS HEARTBEAT"):
-    st.session_state.auto_governance = True
-    st.rerun()
-
-if st.session_state.auto_governance:
-    st.sidebar.warning("HEARTBEAT: ACTIVE // KINETIC ARBITRAGE ENGAGED")
-    try:
-        result = asyncio.run(execute_sovereign_edict())
-        st.json(result)
-        time.sleep(5) # 5-second sovereign reconciliation cycle
-        st.rerun()
-    except Exception as e:
-        st.error(f"GOVERNANCE DRIFT: {str(e)}")
-        st.session_state.auto_governance = False
+if st.button("INITIATE SOVEREIGN PULSE"):
+    with st.spinner("Reconciling silicon state-space..."):
+        try:
+            result = asyncio.run(execute_sovereign_edict())
+            st.json(result)
+        except Exception as e:
+            st.error(f"GOVERNANCE DRIFT DETECTED: {str(e)}")
 
 st.subheader("SYSTEM AUDIT TRAIL")
-st.info("System awaiting pulse initialization...")
+st.info("System awaiting manual Edict initiation.")
