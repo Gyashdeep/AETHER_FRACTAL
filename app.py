@@ -3,10 +3,10 @@ import sqlite3
 import pandas as pd
 import asyncio
 import os
-import psutil # For actual hardware telemetry
+import psutil
 from groq import AsyncGroq
 
-# Setup for "QUANTUM-CORE VANTAGE" // Sovereign Silicon Controller
+# CONFIGURATION // QUANTUM-CORE VANTAGE
 st.set_page_config(page_title="VANTAGE // KINETIC ARBITRAGE", layout="wide")
 st.markdown("""
     <style>
@@ -17,44 +17,41 @@ st.markdown("""
 st.title("💠 QUANTUM-CORE // VANTAGE")
 st.markdown("### Autonomous Kinetic Arbitrage & Sovereign Silicon Governance")
 
-# THE GOVERNANCE ENGINE
-async def run_sovereign_governance():
-    # 1. Capture Real-Time Telemetry
+# --- SOVEREIGN GOVERNANCE ENGINE ---
+async def execute_sovereign_logic():
+    # 1. Hardware Telemetry
     telemetry = {
-        "cpu_usage": psutil.cpu_percent(),
-        "memory_usage": psutil.virtual_memory().percent,
-        "load_avg": psutil.getloadavg()
+        "cpu_load": psutil.cpu_percent(),
+        "mem_load": psutil.virtual_memory().percent,
+        "ts": pd.Timestamp.now().isoformat()
     }
     
-    # 2. Sovereign Decision Logic via LLM (Edge-Orchestrator)
-    client = AsyncGroq(api_key=st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY")))
+    # 2. Autonomous Decision Logic
+    client = AsyncGroq(api_key=st.secrets.get("GROQ_API_KEY"))
+    prompt = f"ACT AS QUANTUM-CORE VANTAGE. Analyze {telemetry}. Output ONLY JSON: {{'decision': 'BOOST/THROTTLE', 'rationale': '...', 'yield_pct': '...'}}"
     
     response = await client.chat.completions.create(
         model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": "ACT AS VANTAGE GOVERNOR. You are an autonomous agent managing high-performance compute. Your goal: Maximize Profitability vs Energy-Cost. Output JSON ONLY: {'action': 'THROTTLE/BOOST', 'reason': '...', 'yield_est': '...'}"},
-            {"role": "user", "content": f"Telemetry Data: {telemetry}"}
-        ],
+        messages=[{"role": "system", "content": prompt}],
         temperature=0.0
     )
     
-    # 3. Log to Ledger
     decision = response.choices[0].message.content
+    
+    # 3. Persistent Ledger
     conn = sqlite3.connect("quantum_ledger.db")
     conn.execute("CREATE TABLE IF NOT EXISTS logs (ts REAL, telemetry TEXT, decision TEXT)")
     conn.execute("INSERT INTO logs VALUES (?, ?, ?)", (pd.Timestamp.now().timestamp(), str(telemetry), decision))
     conn.commit()
     conn.close()
-    
-    return telemetry, decision
+    return decision
 
-# INTERFACE
-if st.button("INITIATE KINETIC ARBITRAGE PING"):
-    with st.spinner("Governor calculating optimal compute state..."):
-        telemetry, decision = asyncio.run(run_sovereign_governance())
+# --- INTERFACE ---
+if st.button("INITIATE KINETIC ARBITRAGE"):
+    with st.spinner("Vantage Governor calculating optimal silicon state..."):
+        decision = asyncio.run(execute_sovereign_logic())
         st.json(decision)
 
-# AUDIT TRAIL
 st.subheader("SYSTEM AUDIT TRAIL")
 try:
     conn = sqlite3.connect("quantum_ledger.db")
