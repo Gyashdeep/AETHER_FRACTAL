@@ -3,6 +3,7 @@ import psutil
 import json
 import asyncio
 from groq import AsyncGroq
+import time
 
 # --- SOVEREIGN CONFIGURATION ---
 st.set_page_config(page_title="AETHER-KINETIC // VANTAGE", layout="wide")
@@ -13,17 +14,14 @@ async def execute_sovereign_edict():
     telemetry = {
         "cpu_load": psutil.cpu_percent(interval=0.1),
         "mem_load": psutil.virtual_memory().percent,
-        "ts": "ACTIVE"
+        "status": "OPERATIONAL_NODE"
     }
     
-    # Initialize API
     client = AsyncGroq(api_key=st.secrets["GROQ_API_KEY"])
     
-    # Enhanced prompt for strict JSON compliance
     prompt = """
     ACT AS AETHER-KINETIC GOVERNANCE. 
     Analyze telemetry and output ONLY raw, parseable JSON. 
-    Do not include markdown tags or extra text. 
     Format: {"decision": "BOOST/THROTTLE", "yield": "0.00%", "rationale": "..."}
     """
     
@@ -36,24 +34,32 @@ async def execute_sovereign_edict():
         temperature=0.0
     )
     
-    # Hardened Parsing Logic
-    raw_content = response.choices[0].message.content.strip()
-    clean_content = raw_content.replace('```json', '').replace('```', '').strip()
-    
-    return json.loads(clean_content)
+    raw = response.choices[0].message.content.strip()
+    clean = raw.replace('```json', '').replace('```', '').strip()
+    return json.loads(clean)
 
 # --- UI GATEWAY ---
 st.title("💠 AETHER-KINETIC // VANTAGE")
 st.markdown("### Autonomous Sovereign Governance | Kinetic Arbitrage Engine")
 
-if st.button("INITIATE SOVEREIGN PULSE"):
-    with st.spinner("Reconciling silicon state-space..."):
-        try:
-            result = asyncio.run(execute_sovereign_edict())
-            st.json(result)
-        except Exception as e:
-            st.error(f"GOVERNANCE DRIFT DETECTED: {str(e)}")
-            st.code(f"Raw Output received: {raw_content if 'raw_content' in locals() else 'None'}")
+# Auto-Governance Heartbeat Logic
+if "auto_governance" not in st.session_state:
+    st.session_state.auto_governance = False
+
+if st.sidebar.button("ACTIVATE AUTONOMOUS HEARTBEAT"):
+    st.session_state.auto_governance = True
+    st.rerun()
+
+if st.session_state.auto_governance:
+    st.sidebar.warning("HEARTBEAT: ACTIVE // KINETIC ARBITRAGE ENGAGED")
+    try:
+        result = asyncio.run(execute_sovereign_edict())
+        st.json(result)
+        time.sleep(5) # 5-second sovereign reconciliation cycle
+        st.rerun()
+    except Exception as e:
+        st.error(f"GOVERNANCE DRIFT: {str(e)}")
+        st.session_state.auto_governance = False
 
 st.subheader("SYSTEM AUDIT TRAIL")
-st.info("System operational. Awaiting kinetic state-space reconciliation.")
+st.info("System awaiting pulse initialization...")
