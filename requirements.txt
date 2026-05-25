@@ -1,8 +1,4 @@
 streamlit
-plotly
-pandas
-fastapi
-uvicorn
 groq
-orjson
-requests
+psutil
+pandas
