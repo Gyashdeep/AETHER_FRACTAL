@@ -1,11 +1,10 @@
 import os
 import time
-import asyncio
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List
 
 import uvicorn
-import orjson  # Rust-based, ultra-low-latency serialization
+import orjson  # Rust-based serialization
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import ORJSONResponse 
 from pydantic import BaseModel, Field, ValidationError
@@ -41,7 +40,7 @@ MODEL_FALLBACK_CASCADE: List[str] = [
 ]
 
 # =====================================================================
-# 2. SEED ENGINE CORE LOGIC (Shared Across API & Direct UI Context)
+# 2. CORE LOGIC (Safe to Import Anywhere - No FastAPI Dependencies)
 # =====================================================================
 async def run_resilient_cascade(client: AsyncGroq, telemetry: Dict[str, Any], anomaly: str) -> Dict[str, Any]:
     system_prompt = (
@@ -73,32 +72,30 @@ async def run_resilient_cascade(client: AsyncGroq, telemetry: Dict[str, Any], an
             return validated_command.model_dump()
             
         except (ValidationError, orjson.JSONDecodeError) as schema_err:
-            print(f"[FIREWALL INTERCEPT] Model {model} breached structural limits: {schema_err}")
+            print(f"[FIREWALL] Structural anomaly on {model}: {schema_err}")
             continue
-        except RateLimitError as rate_err:
-            print(f"[TRAFFIC CONSTRAINT] Model {model} hit Rate Limits. Error: {rate_err}")
+        except RateLimitError:
+            print(f"[TRAFFIC] Shift cascade on {model} due to 429 constraints.")
             continue
         except Exception as api_err:
-            print(f"[NETWORK ERROR] Model {model} execution failed: {api_err}")
+            print(f"[NETWORK] Failure on {model}: {api_err}")
             continue
 
     raise RuntimeError("CRITICAL SHUTDOWN: Entire multi-model fallback loop exhausted.")
 
 # =====================================================================
-# 3. HIGH-PERFORMANCE LIFESPAN & FASTAPI INSTANTIATION
+# 3. ISOLATED WEB SERVER GATEWAY LAYER 
 # =====================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[KERNEL] Booting High-Frequency Actuation Subsystem...")
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        raise RuntimeError("CRITICAL SHUTDOWN: GROQ_API_KEY environment variable is unassigned.")
-    
+        raise RuntimeError("CRITICAL SHUTDOWN: GROQ_API_KEY unassigned.")
     app.state.ai_client = AsyncGroq(api_key=api_key)
     yield  
-    print("[KERNEL] Initiating secure resource teardown...")
     await app.state.ai_client.close()
 
+# FastAPI instantiation wrapper
 app = FastAPI(title="AETHER-FRACTAL Core Engine", lifespan=lifespan, default_response_class=ORJSONResponse)
 
 @app.post("/api/v1/actuate", status_code=status.HTTP_200_OK)
@@ -116,10 +113,6 @@ async def handle_telemetry_actuation(payload: TelemetryPayload):
     except RuntimeError as ex:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(ex))
 
-# =====================================================================
-# 4. ENVIRONMENT-AGNOSTIC RUNTIME GUARANTEE
-# =====================================================================
 if __name__ == "__main__":
-    # This block ONLY fires if you execute 'python main.py' locally.
-    # It will never run or freeze when deployed inside Streamlit Cloud.
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, loop="uvloop", log_level="info")
+    # Standard standard asyncio event loop to ensure complete multi-platform stability
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, log_level="info")
